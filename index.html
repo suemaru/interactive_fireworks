@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Pupil Fireworks</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #app {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #stage-container {
+            position: relative;
+            background: #000;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+        }
+
+        #trails-canvas {
+            z-index: 1;
+        }
+
+        #main-canvas {
+            z-index: 2;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 10;
+        }
+
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4444;
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+
+        .loading-spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* ハイパフォーマンス設定 */
+        #stage-container {
+            will-change: transform;
+        }
+
+        canvas {
+            image-rendering: optimizeSpeed;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: optimize-contrast;
+        }
+
+        /* Tap to launch ヒント */
+        #tap-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            z-index: 100;
+            animation: glow 2s ease-in-out infinite alternate;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            display: none; /* 初期状態では非表示 */
+        }
+
+        @keyframes glow {
+            from {
+                opacity: 0.4;
+                text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+            }
+            to {
+                opacity: 1;
+                text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #loading {
+                font-size: 16px;
+            }
+            
+            #tap-hint {
+                font-size: 16px;
+                bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="stage-container">
+            <canvas id="trails-canvas"></canvas>
+            <canvas id="main-canvas"></canvas>
+        </div>
+        
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            <div>Loading assets...</div>
+        </div>
+        
+        <div id="error">
+            <h3>Error</h3>
+            <p id="error-message">An error occurred while loading the application.</p>
+        </div>
+        
+        <div id="tap-hint">Tap or click to launch</div>
+    </div>
+
+    <script src="js/stage.js?v=20250729215500"></script>
+    <script src="js/fireworks-core.js?v=20250729215500"></script>
+    <script src="js/pupil-fireworks.js?v=20250729215500"></script>
+    <script src="js/app.js?v=20250729215500"></script>
+</body>
+</html> 
