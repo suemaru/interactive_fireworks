@@ -164,20 +164,11 @@ class PupilFireworksApp {
             window.hideTapHint();
         }
         
-        // タップ位置を取得
-        const tapX = event.x;
-        const tapY = event.y;
+        // モバイル：どこをタップしてもスペースキー相当の動作
+        // 瞳領域内のランダム位置から遠近感のある花火を発射
+        this.createRandomDepthFireworks();
         
-        // マスク領域内かどうかをチェック
-        if (!this.isPointInMask(tapX, tapY)) {
-            console.log(`Tap at (${tapX}, ${tapY}) is outside mask area - ignoring`);
-            return; // マスク領域外なら何もしない
-        }
-        
-        // 遠近感のある花火を3〜5発発射
-        this.createDepthVariationFireworks(tapX, tapY);
-        
-        console.log(`Depth-varied fireworks launched from tap at (${tapX}, ${tapY})!`);
+        console.log(`Random depth fireworks launched from mobile tap!`);
     }
     
     createFirework(x, y, depthOptions = {}) {
@@ -287,6 +278,51 @@ class PupilFireworksApp {
         }
         
         return layers[layers.length - 1]; // フォールバック
+    }
+    
+    createRandomDepthFireworks() {
+        // 瞳領域内のランダムな位置を取得（3〜5発分）
+        const fireworkCount = 3 + Math.floor(Math.random() * 3); // 3〜5発
+        const positions = this.getRandomMaskPositions(fireworkCount);
+        
+        if (positions.length > 0) {
+            // 各花火に遠近感を付けて発射（スペースキー相当）
+            for (let i = 0; i < positions.length; i++) {
+                const position = positions[i];
+                
+                // 遠近感の深度レイヤー定義
+                const depthLayers = [
+                    { name: 'background', weight: 2, sizeMultiplier: 0.6, intensityMultiplier: 0.4, heightOffset: 0 },
+                    { name: 'middle', weight: 5, sizeMultiplier: 1.0, intensityMultiplier: 1.0, heightOffset: 50 },
+                    { name: 'foreground', weight: 3, sizeMultiplier: 1.6, intensityMultiplier: 1.3, heightOffset: 100 }
+                ];
+                
+                const layer = this.selectRandomDepthLayer(depthLayers);
+                
+                // ランダムな高さオフセットを追加（より自然に）
+                const heightVariation = -50 + Math.random() * 100; // ±50pxの変化
+                const finalY = Math.max(50, position.y + layer.heightOffset + heightVariation);
+                
+                // 発射タイミングを遅延（自然な時差）
+                const delay = i * (100 + Math.random() * 200); // 100〜300msの間隔
+                
+                setTimeout(() => {
+                    this.createFirework(position.x, finalY, {
+                        depth: layer.name,
+                        sizeMultiplier: layer.sizeMultiplier,
+                        intensityMultiplier: layer.intensityMultiplier
+                    });
+                }, delay);
+            }
+            
+            console.log(`${fireworkCount} random depth fireworks launched from pupil area!`);
+        } else {
+            // フォールバック：画面中央で花火発射
+            const centerX = this.stages.main.width / 2;
+            const centerY = this.stages.main.height / 2;
+            this.createFirework(centerX, centerY);
+            console.log('Fallback: firework launched from center');
+        }
     }
     
     createDualFireworks() {
