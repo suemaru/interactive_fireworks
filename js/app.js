@@ -197,21 +197,13 @@ function setupKeyboardShortcuts() {
                 hideTapHint();
                 
                 if (app.isRunning) {
-                    // 画面中央付近で2箇所時間差花火発射
-                    const centerX = app.stages.main.width / 2 - 30;
-                    const centerY = app.stages.main.height / 2 - 30;
+                    // 画面中央を基点とした遠近感花火発射
+                    const centerX = app.stages.main.width / 2;
+                    const centerY = app.stages.main.height / 2;
                     
-                    // 1つ目の花火を即座に発射
-                    app.createFirework(centerX, centerY);
+                    app.createDepthVariationFireworks(centerX, centerY);
                     
-                    // 2つ目の花火を0.2秒後に発射（少しずらして）
-                    setTimeout(() => {
-                        const offsetX = centerX + (Math.random() - 0.5) * 100;
-                        const offsetY = centerY + (Math.random() - 0.5) * 100;
-                        app.createFirework(offsetX, offsetY);
-                    }, 200);
-                    
-                    console.log('Dual fireworks launched from spacebar!');
+                    console.log('Depth-varied fireworks launched from spacebar!');
                 } else {
                     app.resume();
                 }

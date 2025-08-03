@@ -164,24 +164,28 @@ class PupilFireworksApp {
             window.hideTapHint();
         }
         
-        // スペースキーと全く同じ処理：画面中央付近で2箇所時間差花火発射
-        const centerX = this.stages.main.width / 2 - 30;
-        const centerY = this.stages.main.height / 2 - 30;
+        // タップ位置を取得
+        const tapX = event.x;
+        const tapY = event.y;
         
-        // 1つ目の花火を即座に発射
-        this.createFirework(centerX, centerY);
+        // マスク領域内かどうかをチェック
+        if (!this.isPointInMask(tapX, tapY)) {
+            console.log(`Tap at (${tapX}, ${tapY}) is outside mask area - ignoring`);
+            return; // マスク領域外なら何もしない
+        }
         
-        // 2つ目の花火を0.2秒後に発射（少しずらして）
-        setTimeout(() => {
-            const offsetX = centerX + (Math.random() - 0.5) * 100;
-            const offsetY = centerY + (Math.random() - 0.5) * 100;
-            this.createFirework(offsetX, offsetY);
-        }, 200);
+        // 遠近感のある花火を3〜5発発射
+        this.createDepthVariationFireworks(tapX, tapY);
         
-        console.log('Dual fireworks launched from click/tap!');
+        console.log(`Depth-varied fireworks launched from tap at (${tapX}, ${tapY})!`);
     }
     
-    createFirework(x, y) {
+    createFirework(x, y, depthOptions = {}) {
+        // デフォルトの深度オプション
+        const depth = depthOptions.depth || 'middle';
+        const sizeMultiplier = depthOptions.sizeMultiplier || 1.0;
+        const intensityMultiplier = depthOptions.intensityMultiplier || 1.0;
+        
         // ランダムな花火タイプを選択
         const shellTypes = [
             FireworksCore.crysanthemumShell,
@@ -191,11 +195,98 @@ class PupilFireworksApp {
         ];
         
         const shellType = shellTypes[Math.floor(Math.random() * shellTypes.length)];
-        const shell = new FireworksCore.Shell(shellType(this.config.fireworkSize));
+        
+        // 深度に応じてサイズ調整
+        const adjustedSize = Math.max(0, Math.min(4, this.config.fireworkSize * sizeMultiplier));
+        const shell = new FireworksCore.Shell(shellType(adjustedSize));
+        
+        // 深度情報を保存（描画時に使用）
+        shell.depthLayer = depth;
+        shell.intensityMultiplier = intensityMultiplier;
         
         shell.burst(x, y);
         
-        console.log(`Firework created at (${x}, ${y})`);
+        console.log(`Firework created at (${x}, ${y}) with depth: ${depth}, size: ${adjustedSize.toFixed(1)}`);
+    }
+    
+    /**
+     * 遠近感のある花火発射システム
+     * タップ位置を中心に手前・中間・奥の花火をランダム配置
+     */
+    createDepthVariationFireworks(tapX, tapY) {
+        const fireworkCount = 3 + Math.floor(Math.random() * 3); // 3〜5発
+        
+        // 深度レイヤー定義
+        const depthLayers = [
+            {
+                name: 'background',
+                weight: 0.3, // 30%の確率
+                sizeMultiplier: 0.4, // 40%のサイズ
+                intensityMultiplier: 0.3, // 30%の明度
+                spreadRadius: 200, // 広い分散範囲
+                heightOffset: -80 // より高い位置
+            },
+            {
+                name: 'middle',
+                weight: 0.4, // 40%の確率
+                sizeMultiplier: 0.7, // 70%のサイズ
+                intensityMultiplier: 0.6, // 60%の明度
+                spreadRadius: 120, // 中程度の分散範囲
+                heightOffset: -40 // 中程度の高さ
+            },
+            {
+                name: 'foreground',
+                weight: 0.3, // 30%の確率
+                sizeMultiplier: 1.2, // 120%のサイズ
+                intensityMultiplier: 1.0, // 100%の明度
+                spreadRadius: 80, // 狭い分散範囲
+                heightOffset: 0 // 手前は元の高さ
+            }
+        ];
+        
+        // 各花火の発射
+        for (let i = 0; i < fireworkCount; i++) {
+            // 深度レイヤーをランダム選択（重み付き）
+            const layer = this.selectRandomDepthLayer(depthLayers);
+            
+            // タップ位置からの分散計算
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * layer.spreadRadius;
+            const offsetX = Math.cos(angle) * distance;
+            const offsetY = Math.sin(angle) * distance;
+            
+            // 最終的な発射位置
+            const finalX = tapX + offsetX;
+            const finalY = tapY + offsetY + layer.heightOffset;
+            
+            // 発射タイミングを遅延（自然な時差）
+            const delay = i * (100 + Math.random() * 200); // 100〜300msの間隔
+            
+            setTimeout(() => {
+                this.createFirework(finalX, finalY, {
+                    depth: layer.name,
+                    sizeMultiplier: layer.sizeMultiplier,
+                    intensityMultiplier: layer.intensityMultiplier
+                });
+            }, delay);
+        }
+    }
+    
+    /**
+     * 重み付きランダム選択
+     */
+    selectRandomDepthLayer(layers) {
+        const totalWeight = layers.reduce((sum, layer) => sum + layer.weight, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (const layer of layers) {
+            random -= layer.weight;
+            if (random <= 0) {
+                return layer;
+            }
+        }
+        
+        return layers[layers.length - 1]; // フォールバック
     }
     
     createDualFireworks() {
@@ -218,6 +309,36 @@ class PupilFireworksApp {
             const centerY = this.stages.main.height / 2;
             this.createFirework(centerX, centerY);
         }
+    }
+    
+    isPointInMask(x, y) {
+        // マスク画像がない場合は常にtrue
+        if (!this.assets.mask) {
+            return true;
+        }
+        
+        const stage = this.stages.main;
+        const displayWidth = stage.width;
+        const displayHeight = stage.height;
+        
+        // 座標が画面外の場合はfalse
+        if (x < 0 || y < 0 || x >= displayWidth || y >= displayHeight) {
+            return false;
+        }
+        
+        // マスクを一時的にキャンバスに描画してピクセル情報を取得
+        const maskCanvas = document.createElement('canvas');
+        const maskCtx = maskCanvas.getContext('2d');
+        maskCanvas.width = displayWidth;
+        maskCanvas.height = displayHeight;
+        
+        // マスクを描画（表示サイズに合わせてスケール）
+        maskCtx.drawImage(this.assets.mask, 0, 0, displayWidth, displayHeight);
+        const imageData = maskCtx.getImageData(Math.floor(x), Math.floor(y), 1, 1);
+        const alpha = imageData.data[3];
+        
+        // 半透明以上なら有効領域
+        return alpha > 128;
     }
     
     getRandomMaskPositions(count = 2) {
@@ -369,10 +490,7 @@ class PupilFireworksApp {
         // メインキャンバスクリア
         mainCtx.clearRect(0, 0, width, height);
         
-        // 爆発フラッシュ描画
-        this.renderBurstFlashes(trailsCtx);
-        
-        // 花火描画（マスク適用）
+        // 花火と爆発フラッシュを一緒にマスク適用
         this.renderFireworksWithMask(trailsCtx, mainCtx, width, height);
         
         // 顔全体へのグローエフェクト（C: 色温度変化 + D: 動的明度変化）
@@ -407,6 +525,9 @@ class PupilFireworksApp {
         // オフスクリーンキャンバスで花火を描画
         this.offscreenCtx.clearRect(0, 0, width, height);
         
+        // 爆発フラッシュを先に描画（マスク適用対象）
+        this.renderBurstFlashes(this.offscreenCtx);
+        
         // 花火描画
         this.renderFireworks(this.offscreenCtx);
         
@@ -422,40 +543,120 @@ class PupilFireworksApp {
     }
     
     renderFireworks(ctx) {
-        // Starsの描画
-        ctx.lineWidth = FireworksCore.Star.drawWidth;
+        // 深度順にレンダリング（奥から手前へ）
+        const depthOrder = ['background', 'middle', 'foreground'];
+        
+        depthOrder.forEach(depthLayer => {
+            this.renderFireworksLayer(ctx, depthLayer);
+        });
+    }
+    
+    renderFireworksLayer(ctx, targetDepth) {
+        // 深度に応じた透明度設定（線の太さは美しさ重視で固定）
+        const depthSettings = {
+            'background': { alpha: 0.4, glowEffect: false },
+            'middle': { alpha: 0.8, glowEffect: true },
+            'foreground': { alpha: 1.0, glowEffect: true }
+        };
+        
+        const settings = depthSettings[targetDepth] || depthSettings['middle'];
+        
+        // Starsの描画（深度フィルタリング） - 美しい2層炎描画
         ctx.lineCap = 'round';
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
         
         FireworksCore.COLOR_CODES.forEach(color => {
             const stars = FireworksCore.Star.active[color];
-            ctx.strokeStyle = color;
-            ctx.beginPath();
-            stars.forEach(star => {
-                if (star.visible) {
-                    ctx.moveTo(star.x, star.y);
-                    ctx.lineTo(star.prevX, star.prevY);
-                }
+            
+            // 対象深度のパーティクルのみフィルタリング
+            const depthFilteredStars = stars.filter(star => {
+                return star.depthLayer === targetDepth || (!star.depthLayer && targetDepth === 'middle');
             });
-            ctx.stroke();
+            
+            if (depthFilteredStars.length === 0) return;
+            
+            // 2層描画：外炎（太い）→ 内炎（細い）の順序で美しいグラデーション
+            depthFilteredStars.forEach(star => {
+                if (!star.visible) return;
+                
+                const lifeRatio = star.life / star.fullLife;
+                const intensity = settings.alpha * lifeRatio;
+                
+                // 動的色変化の計算
+                const evolutionColor = FireworksCore.interpolateColorEvolution(star.colorEvolution, lifeRatio);
+                
+                // 外炎描画（太い線、色彩豊か）
+                ctx.globalAlpha = intensity * 0.8;
+                ctx.lineWidth = FireworksCore.Star.drawWidth + 1;
+                ctx.strokeStyle = evolutionColor || star.colorVariation || star.color;
+                ctx.beginPath();
+                ctx.moveTo(star.x, star.y);
+                ctx.lineTo(star.prevX, star.prevY);
+                ctx.stroke();
+                
+                // 内炎描画（細い線、白熱）
+                ctx.globalAlpha = intensity;
+                ctx.lineWidth = Math.max(1, FireworksCore.Star.drawWidth - 1);
+                ctx.strokeStyle = star.flameGradient ? star.flameGradient.inner : star.color;
+                ctx.beginPath();
+                ctx.moveTo(star.x, star.y);
+                ctx.lineTo(star.prevX, star.prevY);
+                ctx.stroke();
+            });
         });
         
-        // Sparksの描画
-        ctx.lineWidth = FireworksCore.Spark.drawWidth;
-        ctx.lineCap = 'butt';
+        // Sparksの描画（深度フィルタリング）- 繊細で美しい火花表現
+        ctx.lineCap = 'round';
         
         FireworksCore.COLOR_CODES.forEach(color => {
             const sparks = FireworksCore.Spark.active[color];
-            ctx.strokeStyle = color;
-            ctx.beginPath();
-            sparks.forEach(spark => {
+            
+            // 対象深度のパーティクルのみフィルタリング
+            const depthFilteredSparks = sparks.filter(spark => {
+                return spark.depthLayer === targetDepth || (!spark.depthLayer && targetDepth === 'middle');
+            });
+            
+            if (depthFilteredSparks.length === 0) return;
+            
+            // 個別に美しい火花を描画
+            depthFilteredSparks.forEach(spark => {
+                const lifeRatio = spark.life / spark.fullLife;
+                const intensity = settings.alpha * lifeRatio;
+                
+                // 動的色変化の計算
+                const evolutionColor = FireworksCore.interpolateColorEvolution(spark.colorEvolution, lifeRatio);
+                const currentColor = evolutionColor || spark.colorVariation || spark.color;
+                
+                // グロー効果（寿命に応じて変化）
+                if (settings.glowEffect && lifeRatio > 0.3) {
+                    ctx.globalAlpha = intensity * 0.4;
+                    ctx.lineWidth = Math.max(1.2, FireworksCore.Spark.drawWidth * 1.4);
+                    ctx.strokeStyle = currentColor;
+                    ctx.beginPath();
+                    ctx.moveTo(spark.x, spark.y);
+                    ctx.lineTo(spark.prevX, spark.prevY);
+                    ctx.stroke();
+                }
+                
+                // メイン火花描画（細く美しく）
+                ctx.globalAlpha = intensity;
+                ctx.lineWidth = Math.max(0.4, FireworksCore.Spark.drawWidth * 0.7);
+                
+                // 寿命後半は内炎色（より白く）に変化、またはevolution色使用
+                if (lifeRatio < 0.5 && spark.flameGradient && !evolutionColor) {
+                    ctx.strokeStyle = spark.flameGradient.inner;
+                } else {
+                    ctx.strokeStyle = currentColor;
+                }
+                
+                ctx.beginPath();
                 ctx.moveTo(spark.x, spark.y);
                 ctx.lineTo(spark.prevX, spark.prevY);
+                ctx.stroke();
             });
-            ctx.stroke();
         });
+        
+        // アルファ値をリセット
+        ctx.globalAlpha = 1.0;
     }
     
     applyMask(width, height) {
@@ -596,8 +797,8 @@ class PupilFireworksApp {
         };
         
         // Star（メインパーティクル）をカウント
-        Object.keys(Star.active).forEach(color => {
-            const particles = Star.active[color];
+        Object.keys(FireworksCore.Star.active).forEach(color => {
+            const particles = FireworksCore.Star.active[color];
             if (particles.length > 0) {
                 data.colors.push({ color, count: particles.length });
                 data.particleCount += particles.length;
@@ -605,15 +806,15 @@ class PupilFireworksApp {
         });
         
         // Spark（火花）をカウント
-        Object.keys(Spark.active).forEach(color => {
-            const sparks = Spark.active[color];
+        Object.keys(FireworksCore.Spark.active).forEach(color => {
+            const sparks = FireworksCore.Spark.active[color];
             if (sparks.length > 0) {
                 data.particleCount += sparks.length * 0.3; // 火花は重み軽め
             }
         });
         
         // BurstFlash（爆発フラッシュ）をカウント
-        data.burstCount = BurstFlash.active.length;
+        data.burstCount = FireworksCore.BurstFlash.active.length;
         
         // 総強度計算
         data.totalIntensity = Math.min(1.0, 

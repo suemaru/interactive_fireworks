@@ -39,6 +39,143 @@ COLOR_CODES.forEach(hex => {
     };
 });
 
+// 美しい色バリエーション生成システム
+function generateColorVariation(baseColor, variation = 0.15) {
+    const rgb = COLOR_TUPLES[baseColor];
+    if (!rgb) return baseColor;
+    
+    // HSLに変換して色相・彩度・明度を微調整
+    const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+    
+    // 微妙な変化を加える
+    const newH = (h + (Math.random() - 0.5) * variation * 60) % 360; // 色相±変化
+    const newS = Math.max(0, Math.min(1, s + (Math.random() - 0.5) * variation * 0.3)); // 彩度調整
+    const newL = Math.max(0.1, Math.min(0.9, l + (Math.random() - 0.5) * variation * 0.2)); // 明度調整
+    
+    const newRgb = hslToRgb(newH / 360, newS, newL);
+    return `rgb(${Math.round(newRgb.r)}, ${Math.round(newRgb.g)}, ${Math.round(newRgb.b)})`;
+}
+
+// HSL変換ユーティリティ
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+    
+    if (max === min) {
+        h = s = 0;
+    } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return { h: h * 360, s, l };
+}
+
+function hslToRgb(h, s, l) {
+    const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+    
+    let r, g, b;
+    if (s === 0) {
+        r = g = b = l;
+    } else {
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+    return { r: r * 255, g: g * 255, b: b * 255 };
+}
+
+// 炎の内外グラデーション色生成
+function generateFlameGradient(baseColor, intensity = 1.0) {
+    // 内炎（中心）: より白く、より熱く
+    const innerColor = generateInnerFlameColor(baseColor, intensity);
+    // 外炎（外側）: 基本色をベースにした美しい色調
+    const outerColor = generateColorVariation(baseColor, 0.1);
+    
+    return { inner: innerColor, outer: outerColor };
+}
+
+function generateInnerFlameColor(baseColor, intensity) {
+    const rgb = COLOR_TUPLES[baseColor];
+    if (!rgb) return '#ffffff';
+    
+    // 白との混合で熱い中心を表現
+    const whiteBlend = Math.min(0.8, intensity * 0.6);
+    const r = Math.round(rgb.r + (255 - rgb.r) * whiteBlend);
+    const g = Math.round(rgb.g + (255 - rgb.g) * whiteBlend);
+    const b = Math.round(rgb.b + (255 - rgb.b) * whiteBlend);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+// 色の時間変化補間関数
+function interpolateColorEvolution(colorEvolution, lifeRatio) {
+    if (!colorEvolution) return null;
+    
+    if (colorEvolution.startColor && colorEvolution.midColor && colorEvolution.endColor) {
+        // 3段階補間（Star用）
+        if (lifeRatio > 0.6) {
+            // 開始 → 中間
+            const t = (lifeRatio - 0.6) / 0.4;
+            return interpolateColors(colorEvolution.startColor, colorEvolution.midColor, t);
+        } else {
+            // 中間 → 終了
+            const t = lifeRatio / 0.6;
+            return interpolateColors(colorEvolution.midColor, colorEvolution.endColor, t);
+        }
+    } else if (colorEvolution.startColor && colorEvolution.endColor) {
+        // 2段階補間（Spark用）
+        return interpolateColors(colorEvolution.startColor, colorEvolution.endColor, 1 - lifeRatio);
+    }
+    
+    return null;
+}
+
+function interpolateColors(color1, color2, t) {
+    // RGB形式の色を解析
+    const rgb1 = parseRgbColor(color1);
+    const rgb2 = parseRgbColor(color2);
+    
+    if (!rgb1 || !rgb2) return color1;
+    
+    const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * t);
+    const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * t);
+    const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * t);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+function parseRgbColor(color) {
+    if (color.startsWith('#')) {
+        return COLOR_TUPLES[color];
+    } else if (color.startsWith('rgb(')) {
+        const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (match) {
+            return {
+                r: parseInt(match[1]),
+                g: parseInt(match[2]),
+                b: parseInt(match[3])
+            };
+        }
+    }
+    return null;
+}
+
 // ランダム色選択
 function randomColorSimple() {
     return COLOR_CODES[Math.random() * COLOR_CODES.length | 0];
@@ -96,7 +233,7 @@ const Star = {
         return {};
     },
 
-    add(x, y, color, angle, speed, life, speedOffX, speedOffY) {
+    add(x, y, color, angle, speed, life, speedOffX, speedOffY, sourceShell) {
         const instance = this._pool.pop() || this._new();
         
         instance.visible = true;
@@ -120,6 +257,24 @@ const Star = {
         instance.sparkLife = 750;
         instance.sparkLifeVariation = 0.25;
         instance.strobe = false;
+        
+        // 美しい色バリエーション生成
+        instance.baseColor = color;
+        instance.colorVariation = generateColorVariation(color, 0.12);
+        instance.flameGradient = generateFlameGradient(color, 1.0);
+        
+        // 動的色変化用の初期設定
+        instance.colorEvolution = {
+            startColor: generateColorVariation(color, 0.05),
+            midColor: generateColorVariation(color, 0.08),
+            endColor: generateInnerFlameColor(color, 0.9) // 最終的により白く
+        };
+        
+        // 深度情報の伝播
+        if (sourceShell) {
+            instance.depthLayer = sourceShell.depthLayer;
+            instance.intensityMultiplier = sourceShell.intensityMultiplier;
+        }
         
         this.active[color].push(instance);
         return instance;
@@ -154,7 +309,7 @@ const Spark = {
         return {};
     },
 
-    add(x, y, color, angle, speed, life) {
+    add(x, y, color, angle, speed, life, sourceShell) {
         const instance = this._pool.pop() || this._new();
         
         instance.x = x;
@@ -165,6 +320,24 @@ const Spark = {
         instance.speedX = Math.sin(angle) * speed;
         instance.speedY = Math.cos(angle) * speed;
         instance.life = life;
+        instance.fullLife = life;
+        
+        // 美しい色バリエーション生成（火花はより控えめに）
+        instance.baseColor = color;
+        instance.colorVariation = generateColorVariation(color, 0.08);
+        instance.flameGradient = generateFlameGradient(color, 0.7);
+        
+        // 火花用の動的色変化（より繊細に）
+        instance.colorEvolution = {
+            startColor: generateColorVariation(color, 0.04),
+            endColor: generateInnerFlameColor(color, 0.6)
+        };
+        
+        // 深度情報の伝播
+        if (sourceShell) {
+            instance.depthLayer = sourceShell.depthLayer;
+            instance.intensityMultiplier = sourceShell.intensityMultiplier;
+        }
         
         this.active[color].push(instance);
         return instance;
@@ -250,7 +423,10 @@ function crossetteEffect(star) {
             star.color,
             angle,
             Math.random() * 0.6 + 0.75,
-            600
+            600,
+            0, // speedOffX
+            0, // speedOffY
+            star // sourceShell (元のstarの深度情報を継承)
         );
     });
 }
@@ -266,7 +442,8 @@ function floralEffect(star) {
             speedMult * 2.4,
             1000 + Math.random() * 300,
             star.speedX,
-            star.speedY
+            star.speedY,
+            star // sourceShell (元のstarの深度情報を継承)
         );
     });
     BurstFlash.add(star.x, star.y, 46);
@@ -281,7 +458,8 @@ function crackleEffect(star) {
             COLOR.Gold,
             angle,
             Math.pow(Math.random(), 0.45) * 2.4,
-            300 + Math.random() * 200
+            300 + Math.random() * 200,
+            star // sourceShell (元のstarの深度情報を継承)
         );
     });
 }
@@ -316,7 +494,10 @@ class Shell {
                 this.color,
                 angle,
                 speedMult * speed,
-                starLife + starLife * (Math.random() - 0.5) * variation
+                starLife + starLife * (Math.random() - 0.5) * variation,
+                0, // speedOffX
+                0, // speedOffY
+                this // sourceShell
             );
             
             // エフェクト適用（火花量1.3倍に増量）
@@ -420,7 +601,8 @@ function updateFireworks(frameTime, speed) {
                             star.sparkColor,
                             Math.random() * PI_2,
                             Math.random() * star.sparkSpeed * burnRate,
-                            star.sparkLife * 0.8 + Math.random() * star.sparkLifeVariation * star.sparkLife
+                            star.sparkLife * 0.8 + Math.random() * star.sparkLifeVariation * star.sparkLife,
+                            star // sourceShell (starの深度情報を継承)
                         );
                     }
                 }
@@ -517,5 +699,8 @@ window.FireworksCore = {
     crysanthemumShell,
     ringShell,
     willowShell,
-    palmShell
+    palmShell,
+    generateColorVariation,
+    generateFlameGradient,
+    interpolateColorEvolution
 }; 
